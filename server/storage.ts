@@ -1,5 +1,6 @@
-import { type JobApplication, type InsertJobApplication } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { type JobApplication, type InsertJobApplication, jobApplications } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, sql, ilike, or } from "drizzle-orm";
 
 export interface IStorage {
   // Job Applications
@@ -19,88 +20,76 @@ export interface IStorage {
   }>;
 }
 
-export class MemStorage implements IStorage {
-  private applications: Map<string, JobApplication>;
-
-  constructor() {
-    this.applications = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getAllApplications(): Promise<JobApplication[]> {
-    return Array.from(this.applications.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    return await db.select().from(jobApplications).orderBy(desc(jobApplications.createdAt));
   }
 
   async getApplicationById(id: string): Promise<JobApplication | undefined> {
-    return this.applications.get(id);
+    const [application] = await db.select().from(jobApplications).where(eq(jobApplications.id, id));
+    return application || undefined;
   }
 
   async createApplication(insertApplication: InsertJobApplication): Promise<JobApplication> {
-    const id = randomUUID();
-    const now = new Date();
-    const application: JobApplication = {
-      ...insertApplication,
-      id,
-      status: insertApplication.status || "applied",
-      salary: insertApplication.salary ?? null,
-      location: insertApplication.location ?? null,
-      jobUrl: insertApplication.jobUrl ?? null,
-      notes: insertApplication.notes ?? null,
-      contactEmail: insertApplication.contactEmail ?? null,
-      contactName: insertApplication.contactName ?? null,
-      applicationDate: insertApplication.applicationDate 
-        ? new Date(insertApplication.applicationDate) 
-        : now,
-      nextStepDate: insertApplication.nextStepDate 
-        ? new Date(insertApplication.nextStepDate) 
-        : null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.applications.set(id, application);
+    const [application] = await db
+      .insert(jobApplications)
+      .values({
+        ...insertApplication,
+        status: insertApplication.status || "applied",
+        applicationDate: insertApplication.applicationDate 
+          ? new Date(insertApplication.applicationDate) 
+          : new Date(),
+        nextStepDate: insertApplication.nextStepDate 
+          ? new Date(insertApplication.nextStepDate) 
+          : null,
+      })
+      .returning();
     return application;
   }
 
   async updateApplication(id: string, updateData: Partial<InsertJobApplication>): Promise<JobApplication | undefined> {
-    const application = this.applications.get(id);
-    if (!application) return undefined;
-
-    const updatedApplication: JobApplication = {
-      ...application,
-      ...updateData,
-      applicationDate: updateData.applicationDate 
-        ? new Date(updateData.applicationDate) 
-        : application.applicationDate,
-      nextStepDate: updateData.nextStepDate 
-        ? new Date(updateData.nextStepDate) 
-        : application.nextStepDate,
-      updatedAt: new Date(),
-    };
-
-    this.applications.set(id, updatedApplication);
-    return updatedApplication;
+    const [application] = await db
+      .update(jobApplications)
+      .set({
+        ...updateData,
+        applicationDate: updateData.applicationDate 
+          ? new Date(updateData.applicationDate) 
+          : undefined,
+        nextStepDate: updateData.nextStepDate 
+          ? new Date(updateData.nextStepDate) 
+          : undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(jobApplications.id, id))
+      .returning();
+    return application || undefined;
   }
 
   async deleteApplication(id: string): Promise<boolean> {
-    return this.applications.delete(id);
+    const result = await db.delete(jobApplications).where(eq(jobApplications.id, id));
+    return result.rowCount > 0;
   }
 
   async getApplicationsByStatus(status: string): Promise<JobApplication[]> {
-    return Array.from(this.applications.values())
-      .filter(app => app.status === status)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return await db
+      .select()
+      .from(jobApplications)
+      .where(eq(jobApplications.status, status))
+      .orderBy(desc(jobApplications.createdAt));
   }
 
   async searchApplications(query: string): Promise<JobApplication[]> {
-    const lowerQuery = query.toLowerCase();
-    return Array.from(this.applications.values())
-      .filter(app => 
-        app.company.toLowerCase().includes(lowerQuery) ||
-        app.position.toLowerCase().includes(lowerQuery) ||
-        app.status.toLowerCase().includes(lowerQuery)
+    return await db
+      .select()
+      .from(jobApplications)
+      .where(
+        or(
+          ilike(jobApplications.company, `%${query}%`),
+          ilike(jobApplications.position, `%${query}%`),
+          ilike(jobApplications.status, `%${query}%`)
+        )
       )
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .orderBy(desc(jobApplications.createdAt));
   }
 
   async getApplicationStats(): Promise<{
@@ -110,22 +99,26 @@ export class MemStorage implements IStorage {
     rejected: number;
     responseRate: number;
   }> {
-    const applications = Array.from(this.applications.values());
-    const total = applications.length;
-    const interviews = applications.filter(app => app.status === "interview").length;
-    const offers = applications.filter(app => app.status === "offer").length;
-    const rejected = applications.filter(app => app.status === "rejected").length;
-    const responded = interviews + offers + rejected;
-    const responseRate = total > 0 ? Math.round((responded / total) * 100) : 0;
+    const [stats] = await db
+      .select({
+        total: sql<number>`cast(count(*) as integer)`,
+        interviews: sql<number>`cast(count(*) filter (where status = 'interview') as integer)`,
+        offers: sql<number>`cast(count(*) filter (where status = 'offer') as integer)`,
+        rejected: sql<number>`cast(count(*) filter (where status = 'rejected') as integer)`,
+      })
+      .from(jobApplications);
+
+    const responded = stats.interviews + stats.offers + stats.rejected;
+    const responseRate = stats.total > 0 ? Math.round((responded / stats.total) * 100) : 0;
 
     return {
-      total,
-      interviews,
-      offers,
-      rejected,
+      total: stats.total,
+      interviews: stats.interviews,
+      offers: stats.offers,
+      rejected: stats.rejected,
       responseRate,
     };
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
