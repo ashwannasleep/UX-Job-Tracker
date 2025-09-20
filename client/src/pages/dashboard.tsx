@@ -5,6 +5,7 @@ import Header from "@/components/layout/header";
 import StatsCard from "@/components/stats-card";
 import ApplicationCard from "@/components/application-card";
 import TimelineItem from "@/components/timeline-item";
+import { DeadlineReminders } from "@/components/deadline-reminders";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -278,6 +279,9 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
+
+              {/* Deadline Reminders */}
+              <DeadlineReminders />
 
               {/* Quick Actions */}
               <div className="bg-card rounded-lg border border-border shadow-sm">

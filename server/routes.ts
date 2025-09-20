@@ -125,6 +125,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Deadline reminder routes
+  // Get upcoming deadlines (default: next 7 days)
+  app.get("/api/deadlines/upcoming", async (req, res) => {
+    try {
+      const days = req.query.days ? parseInt(req.query.days as string) : 7;
+      const deadlines = await storage.getUpcomingDeadlines(days);
+      res.json(deadlines);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch upcoming deadlines" });
+    }
+  });
+
+  // Get overdue deadlines
+  app.get("/api/deadlines/overdue", async (req, res) => {
+    try {
+      const overdue = await storage.getOverdueDeadlines();
+      res.json(overdue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch overdue deadlines" });
+    }
+  });
+
   // Get interview by ID
   app.get("/api/interviews/:id", async (req, res) => {
     try {

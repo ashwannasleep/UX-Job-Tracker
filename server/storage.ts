@@ -181,6 +181,28 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${interviews.scheduledDate} >= ${today} AND ${interviews.status} = 'scheduled'`)
       .orderBy(interviews.scheduledDate);
   }
+
+  // Deadline reminder functionality
+  async getUpcomingDeadlines(days: number = 7): Promise<JobApplication[]> {
+    const today = new Date();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(today.getDate() + days);
+    
+    return await db
+      .select()
+      .from(jobApplications)
+      .where(sql`${jobApplications.nextStepDate} >= ${today} AND ${jobApplications.nextStepDate} <= ${cutoffDate}`)
+      .orderBy(jobApplications.nextStepDate);
+  }
+
+  async getOverdueDeadlines(): Promise<JobApplication[]> {
+    const today = new Date();
+    return await db
+      .select()
+      .from(jobApplications)
+      .where(sql`${jobApplications.nextStepDate} < ${today} AND ${jobApplications.nextStepDate} IS NOT NULL`)
+      .orderBy(jobApplications.nextStepDate);
+  }
 }
 
 export const storage = new DatabaseStorage();
