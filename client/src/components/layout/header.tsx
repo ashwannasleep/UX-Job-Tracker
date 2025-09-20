@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, User } from "lucide-react";
-import ApplicationForm from "@/components/application-form";
+import { Plus, User, ExternalLink } from "lucide-react";
+import { SiLinkedin } from "react-icons/si";
+import ApplicationForm from "../application-form";
+import LinkedInImport from "../linkedin-import";
 
 interface HeaderProps {
   title: string;
@@ -9,6 +12,8 @@ interface HeaderProps {
 }
 
 export default function Header({ title, description }: HeaderProps) {
+  const [linkedInImportOpen, setLinkedInImportOpen] = useState(false);
+
   return (
     <header className="bg-card border-b border-border px-6 py-4">
       <div className="flex items-center justify-between">
@@ -17,6 +22,16 @@ export default function Header({ title, description }: HeaderProps) {
           <p className="text-muted-foreground">{description}</p>
         </div>
         <div className="flex items-center space-x-4">
+          <Button
+            variant="outline"
+            onClick={() => setLinkedInImportOpen(true)}
+            className="flex items-center"
+            data-testid="button-linkedin-import"
+          >
+            <SiLinkedin className="mr-2 h-4 w-4 text-blue-600" />
+            LinkedIn Import
+          </Button>
+          
           <Dialog>
             <DialogTrigger asChild>
               <Button data-testid="button-new-application">
@@ -36,6 +51,11 @@ export default function Header({ title, description }: HeaderProps) {
           </div>
         </div>
       </div>
+
+      <LinkedInImport 
+        isOpen={linkedInImportOpen} 
+        onClose={() => setLinkedInImportOpen(false)} 
+      />
     </header>
   );
 }
