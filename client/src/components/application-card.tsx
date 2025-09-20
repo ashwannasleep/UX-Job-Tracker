@@ -19,16 +19,17 @@ const statusColors = {
 };
 
 export default function ApplicationCard({ application, onEdit, onDelete }: ApplicationCardProps) {
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string) => {
     const now = new Date();
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    const dateObj = new Date(date);
+    const diffInDays = Math.floor((now.getTime() - dateObj.getTime()) / (1000 * 60 * 60 * 24));
     
     if (diffInDays === 0) return "Today";
     if (diffInDays === 1) return "1 day ago";
     if (diffInDays < 7) return `${diffInDays} days ago`;
     if (diffInDays < 14) return "1 week ago";
     if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
-    return format(date, "MMM d, yyyy");
+    return format(dateObj, "MMM d, yyyy");
   };
 
   return (
