@@ -44,6 +44,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Browser extension endpoint for auto-detected applications
+  app.post("/api/extension/applications", async (req, res) => {
+    try {
+      // Map extension data to schema requirements with defaults
+      const applicationData = {
+        company: req.body.company || 'Unknown Company',
+        position: req.body.position || 'Unknown Position', 
+        status: 'applied' as const, // Default status for auto-detected applications
+        applicationDate: req.body.applicationDate || new Date().toISOString(),
+        location: req.body.location || '',
+        jobUrl: req.body.jobUrl || '',
+        notes: req.body.notes ? `${req.body.notes} [Auto-detected by extension]` : '[Auto-detected by extension]',
+        contactEmail: req.body.contactEmail || '',
+        contactName: req.body.contactName || '', 
+        salary: req.body.salary || null,
+        nextStepDate: req.body.nextStepDate || null
+      };
+      
+      const validatedData = insertJobApplicationSchema.parse(applicationData);
+      const application = await storage.createApplication(validatedData);
+      
+      res.status(201).json({
+        success: true,
+        application,
+        message: "Application tracked successfully"
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid application data", 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to create application" 
+      });
+    }
+  });
+
   // Update application
   app.put("/api/applications/:id", async (req, res) => {
     try {
