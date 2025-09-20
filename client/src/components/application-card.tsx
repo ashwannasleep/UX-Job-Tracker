@@ -1,9 +1,10 @@
 import { JobApplication } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Building } from "lucide-react";
+import { Edit, Trash2, Building, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { Link } from "wouter";
 
 interface ApplicationCardProps {
   application: JobApplication;
@@ -58,6 +59,15 @@ export default function ApplicationCard({ application, onEdit, onDelete }: Appli
           {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
         </Badge>
         <div className="flex space-x-1">
+          <Link href={`/applications/${application.id}`}>
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid={`button-view-details-${application.id}`}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </Link>
           <Button
             variant="ghost"
             size="sm"

@@ -1,4 +1,4 @@
-import { type JobApplication, type InsertJobApplication, jobApplications } from "@shared/schema";
+import { type JobApplication, type InsertJobApplication, jobApplications, type Interview, type InsertInterview, interviews } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, ilike, or } from "drizzle-orm";
 
@@ -18,6 +18,14 @@ export interface IStorage {
     rejected: number;
     responseRate: number;
   }>;
+  
+  // Interviews
+  getInterviewsByApplicationId(applicationId: string): Promise<Interview[]>;
+  getInterviewById(id: string): Promise<Interview | undefined>;
+  createInterview(interview: InsertInterview): Promise<Interview>;
+  updateInterview(id: string, interview: Partial<InsertInterview>): Promise<Interview | undefined>;
+  deleteInterview(id: string): Promise<boolean>;
+  getUpcomingInterviews(): Promise<Interview[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -67,7 +75,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteApplication(id: string): Promise<boolean> {
     const result = await db.delete(jobApplications).where(eq(jobApplications.id, id));
-    return result.rowCount > 0;
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   async getApplicationsByStatus(status: string): Promise<JobApplication[]> {
@@ -118,6 +126,60 @@ export class DatabaseStorage implements IStorage {
       rejected: stats.rejected,
       responseRate,
     };
+  }
+
+  // Interview methods
+  async getInterviewsByApplicationId(applicationId: string): Promise<Interview[]> {
+    return await db
+      .select()
+      .from(interviews)
+      .where(eq(interviews.applicationId, applicationId))
+      .orderBy(desc(interviews.scheduledDate));
+  }
+
+  async getInterviewById(id: string): Promise<Interview | undefined> {
+    const [interview] = await db.select().from(interviews).where(eq(interviews.id, id));
+    return interview || undefined;
+  }
+
+  async createInterview(insertInterview: InsertInterview): Promise<Interview> {
+    const [interview] = await db
+      .insert(interviews)
+      .values({
+        ...insertInterview,
+        scheduledDate: new Date(insertInterview.scheduledDate),
+      })
+      .returning();
+    return interview;
+  }
+
+  async updateInterview(id: string, updateData: Partial<InsertInterview>): Promise<Interview | undefined> {
+    const [interview] = await db
+      .update(interviews)
+      .set({
+        ...updateData,
+        scheduledDate: updateData.scheduledDate 
+          ? new Date(updateData.scheduledDate) 
+          : undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(interviews.id, id))
+      .returning();
+    return interview || undefined;
+  }
+
+  async deleteInterview(id: string): Promise<boolean> {
+    const result = await db.delete(interviews).where(eq(interviews.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getUpcomingInterviews(): Promise<Interview[]> {
+    const today = new Date();
+    return await db
+      .select()
+      .from(interviews)
+      .where(sql`${interviews.scheduledDate} >= ${today} AND ${interviews.status} = 'scheduled'`)
+      .orderBy(interviews.scheduledDate);
   }
 }
 

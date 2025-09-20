@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertJobApplicationSchema } from "@shared/schema";
+import { insertJobApplicationSchema, insertInterviewSchema } from "@shared/schema";
 import { LinkedInService } from "./linkedin-service";
 import { linkedInJobSchema, bulkImportSchema } from "@shared/linkedin-types";
 import { z } from "zod";
@@ -101,6 +101,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch statistics" });
+    }
+  });
+
+  // Interview routes
+  // Get interviews for an application
+  app.get("/api/applications/:applicationId/interviews", async (req, res) => {
+    try {
+      const interviews = await storage.getInterviewsByApplicationId(req.params.applicationId);
+      res.json(interviews);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch interviews" });
+    }
+  });
+
+  // Get upcoming interviews
+  app.get("/api/interviews/upcoming", async (req, res) => {
+    try {
+      const interviews = await storage.getUpcomingInterviews();
+      res.json(interviews);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch upcoming interviews" });
+    }
+  });
+
+  // Get interview by ID
+  app.get("/api/interviews/:id", async (req, res) => {
+    try {
+      const interview = await storage.getInterviewById(req.params.id);
+      if (!interview) {
+        return res.status(404).json({ message: "Interview not found" });
+      }
+      res.json(interview);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch interview" });
+    }
+  });
+
+  // Create new interview
+  app.post("/api/interviews", async (req, res) => {
+    try {
+      const validatedData = insertInterviewSchema.parse(req.body);
+      const interview = await storage.createInterview(validatedData);
+      res.status(201).json(interview);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid interview data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create interview" });
+    }
+  });
+
+  // Update interview
+  app.put("/api/interviews/:id", async (req, res) => {
+    try {
+      const validatedData = insertInterviewSchema.partial().parse(req.body);
+      const interview = await storage.updateInterview(req.params.id, validatedData);
+      if (!interview) {
+        return res.status(404).json({ message: "Interview not found" });
+      }
+      res.json(interview);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid interview data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update interview" });
+    }
+  });
+
+  // Delete interview
+  app.delete("/api/interviews/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteInterview(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Interview not found" });
+      }
+      res.json({ message: "Interview deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete interview" });
     }
   });
 
